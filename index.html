@@ -258,6 +258,7 @@
     display:flex;align-items:center;justify-content:center;padding:16px;z-index:50;
   }
   .quiz-card{
+    position:relative;
     background:var(--parchment);border-radius:18px;max-width:420px;width:100%;
     padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.5);border-top:8px solid var(--gold);
     animation:pop .22s cubic-bezier(.34,1.56,.64,1);
@@ -266,7 +267,18 @@
   .quiz-eyebrow{
     font-family:'Kanit',system-ui,sans-serif;font-weight:700;font-size:12px;color:var(--forest);
     text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;
+    padding-right:34px;
   }
+  .quiz-close{
+    position:absolute;top:14px;right:14px;
+    width:30px;height:30px;border-radius:50%;
+    background:rgba(0,0,0,.06);border:none;color:var(--ink);
+    font-size:16px;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:background .12s ease, transform .1s ease;
+  }
+  .quiz-close:hover{background:rgba(0,0,0,.12);}
+  .quiz-close:active{transform:scale(.9);}
   .quiz-q{font-family:'Kanit',system-ui,sans-serif;font-weight:600;font-size:19px;margin:4px 0 16px;line-height:1.4;}
   .quiz-opt{
     display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:#fff;border:2px solid rgba(0,0,0,.1);
@@ -391,6 +403,7 @@
         <!-- ============ QUIZ MODAL (อยู่ใน canvas-fit เพื่อให้แสดงผลตอนเข้าโหมดเต็มจอด้วย) ============ -->
         <div id="quiz-modal" class="hidden">
           <div class="quiz-card">
+            <button class="quiz-close" id="quiz-close" title="ปิด / ข้ามข้อนี้">✕</button>
             <div class="quiz-eyebrow">จุดตรวจแอนติเจนก่อนเก็บเกล็ดเลือด 🔴</div>
             <div class="quiz-q" id="quiz-question"></div>
             <div id="quiz-options"></div>
@@ -1299,6 +1312,7 @@
   
   document.getElementById("btn-mute-start").addEventListener("click", function(){ ensureAudio(); setMuted(!muted); });
   document.getElementById("btn-mute-game").addEventListener("click", function(){ ensureAudio(); setMuted(!muted); });
+  document.getElementById("quiz-close").addEventListener("click", function(){ closeQuiz(); });
 
   /* ============================================================
      INIT
