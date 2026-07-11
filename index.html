@@ -710,7 +710,7 @@
   ============================================================ */
   var canvas = document.getElementById("gameCanvas");
   var ctx = canvas.getContext("2d");
-  var player, camY, particles, keys, nearTreeId, cutCount, mistakes, startTime, elapsed, playing, waveT;
+  var player, camY, particles, keys, nearTreeId, cutCount, mistakes, startTime, elapsed, playing, waveT, ambientMotes;
 
   // ปรับความละเอียดจริงของ canvas ให้ตรงกับขนาดที่แสดงผลบนจอ (คูณ devicePixelRatio)
   // เพื่อให้ภาพคมชัดไม่ว่าจะขยายใหญ่แค่ไหน โดยไม่ต้องแก้ตัวเลขพิกัดในโค้ดวาดภาพเลย
@@ -755,6 +755,17 @@
     startTime = performance.now();
     elapsed = 0;
     waveT = 0;
+    ambientMotes = [];
+    for(var am=0; am<16; am++){
+      ambientMotes.push({
+        x: seededRand(am*29+11)*VIEW_W,
+        y: seededRand(am*29+12)*VIEW_H,
+        speed: 8+seededRand(am*29+13)*14,
+        drift: (seededRand(am*29+14)-0.5)*10,
+        r: 1.5+seededRand(am*29+15)*2.5,
+        phase: seededRand(am*29+16)*6.28
+      });
+    }
     level.trees.forEach(function(t){ t.cut=false; });
   }
 
@@ -852,6 +863,11 @@
     particles = particles.filter(function(p){ return p.life>0; });
 
     waveT += dt;
+
+    ambientMotes.forEach(function(m){
+      m.y -= m.speed*dt;
+      if(m.y < -10){ m.y = VIEW_H+10; m.x = seededRand(Math.random()*1000)*VIEW_W; }
+    });
 
     if(player.y >= level.finishLineY-8 && player.y > level.riverBottom){
       triggerWin();
@@ -1016,6 +1032,17 @@
     drawPlayer();
     ctx.restore();
 
+    ambientMotes.forEach(function(m){
+      var mx = m.x + Math.sin(waveT*0.8+m.phase)*m.drift;
+      var glow = ctx.createRadialGradient(mx,m.y,0,mx,m.y,m.r*3.2);
+      glow.addColorStop(0,"rgba(255,225,200,0.55)");
+      glow.addColorStop(1,"rgba(255,225,200,0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(mx,m.y,m.r*3.2,0,7); ctx.fill();
+      ctx.fillStyle = "rgba(255,245,235,0.7)";
+      ctx.beginPath(); ctx.arc(mx,m.y,m.r*0.7,0,7); ctx.fill();
+    });
+
     var vig = ctx.createRadialGradient(VIEW_W/2,VIEW_H/2,VIEW_H*0.35,VIEW_W/2,VIEW_H/2,VIEW_H*0.85);
     vig.addColorStop(0,"rgba(0,0,0,0)");
     vig.addColorStop(1,"rgba(0,0,0,0.22)");
@@ -1026,7 +1053,8 @@
   /* พุ่มไม้เดิม -> กลุ่มเกล็ดเลือด/เซลล์เม็ดเลือดขาวเล็กๆ ที่ลอยอยู่ในเนื้อเยื่อ (ตกแต่งอย่างเดียว ไม่กระทบ collision) */
   function drawBush(b){
     ctx.save();
-    ctx.translate(b.x, b.y);
+    var bob = Math.sin(waveT*0.9 + b.x*0.04)*2.2;
+    ctx.translate(b.x, b.y+bob);
     ctx.scale(b.s, b.s);
     ctx.fillStyle = "rgba(0,0,0,0.12)";
     ctx.beginPath(); ctx.ellipse(0,11,17,5,0,0,7); ctx.fill();
@@ -1089,29 +1117,71 @@
   /* แม่น้ำเดิม -> บาดแผลที่หลอดเลือดฉีกขาด เลือดไหลผ่าน ต้องเอาเกล็ดเลือดมาอุดเป็นลิ่มเลือด */
   function drawRiverAndBridge(){
     var top = level.riverTop, bot = level.riverBottom;
-    var gRiver = ctx.createLinearGradient(0,top,0,bot);
-    gRiver.addColorStop(0,"#C0392B"); gRiver.addColorStop(1,"#7A0F28");
+
+    ctx.save();
+    // ขอบฝั่งแม่น้ำเป็นเส้นโค้งไม่ตรง ให้ดูเหมือนธารลึกลับมากกว่าท่อเลือดตรงๆ
+    var steps = 24;
+    ctx.beginPath();
+    for(var i=0;i<=steps;i++){
+      var xt = i/steps*VIEW_W;
+      var yt = top + Math.sin(xt*0.018+waveT*0.7)*7 + Math.sin(xt*0.05-waveT*0.4)*4;
+      if(i===0) ctx.moveTo(xt,yt); else ctx.lineTo(xt,yt);
+    }
+    for(var j=steps;j>=0;j--){
+      var xb = j/steps*VIEW_W;
+      var yb = bot + Math.sin(xb*0.018+waveT*0.7+2.4)*7 + Math.sin(xb*0.05-waveT*0.4+1)*4;
+      ctx.lineTo(xb,yb);
+    }
+    ctx.closePath();
+
+    var gRiver = ctx.createLinearGradient(0,top-14,0,bot+14);
+    gRiver.addColorStop(0,"#E0546F");
+    gRiver.addColorStop(0.3,"#B71C3C");
+    gRiver.addColorStop(0.62,"#7A1350");
+    gRiver.addColorStop(1,"#4E0F3A");
     ctx.fillStyle = gRiver;
-    ctx.fillRect(0,top,VIEW_W,bot-top);
-    ctx.strokeStyle = "rgba(255,255,255,0.30)";
-    ctx.lineWidth = 2;
-    for(var w=0; w<3; w++){
+    ctx.fill();
+    ctx.clip();
+
+    // กระแสน้ำหลายชั้น สีแปลกตาไหลสวนกัน ให้ความรู้สึกเป็นธารลึกลับมากกว่าเส้นเลือด
+    var flowColors = ["rgba(255,180,200,0.28)","rgba(255,140,210,0.20)","rgba(120,220,220,0.14)","rgba(255,255,255,0.22)"];
+    for(var w=0; w<4; w++){
       ctx.beginPath();
-      for(var x=0;x<=VIEW_W;x+=16){
-        var y = top+22+w*26 + Math.sin(x*0.05+waveT*2+w)*4;
-        if(x===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      ctx.strokeStyle = flowColors[w];
+      ctx.lineWidth = 2.5+w*0.6;
+      var dir = (w%2===0)? 1 : -1;
+      for(var x=0;x<=VIEW_W;x+=12){
+        var yy = top+16+w*20 + Math.sin(x*0.05*dir+waveT*(1.3+w*0.35)+w*1.7)*8;
+        if(x===0) ctx.moveTo(x,yy); else ctx.lineTo(x,yy);
       }
       ctx.stroke();
     }
+
+    // มอทเรืองแสงลอยตามกระแส เหมือนสปอร์/หิ่งห้อยใต้น้ำ เพิ่มความมีชีวิตชีวา
+    for(var m=0;m<9;m++){
+      var mseed = m*53.7;
+      var mspeed = 26+(m%4)*9;
+      var mx = ((seededRand(m*11+1)*(VIEW_W+60)) + waveT*mspeed) % (VIEW_W+60) - 30;
+      var my = top + 8 + seededRand(m*11+2)*(bot-top-16) + Math.sin(waveT*1.4+m)*4;
+      var mr = 1.6+seededRand(m*11+3)*2.2;
+      var glowM = ctx.createRadialGradient(mx,my,0,mx,my,mr*4);
+      glowM.addColorStop(0,"rgba(255,235,210,0.85)");
+      glowM.addColorStop(1,"rgba(255,235,210,0)");
+      ctx.fillStyle = glowM;
+      ctx.beginPath(); ctx.arc(mx,my,mr*4,0,7); ctx.fill();
+      ctx.fillStyle = "rgba(255,250,235,0.9)";
+      ctx.beginPath(); ctx.arc(mx,my,mr,0,7); ctx.fill();
+    }
+    ctx.restore();
 
     drawBrokenPlank(level.bridgeXMin-26, top-4, -18);
     drawBrokenPlank(level.bridgeXMax+26, top-4, 18);
 
     var total = level.n;
     var plankW = level.bridgeW/total;
-    for(var i=0;i<total;i++){
-      var t = level.trees[i];
-      var px = level.bridgeXMin + i*plankW;
+    for(var i2=0;i2<total;i2++){
+      var t = level.trees[i2];
+      var px = level.bridgeXMin + i2*plankW;
       if(t.cut){
         ctx.fillStyle = "#F2C14E";
         ctx.fillRect(px+2, top-6, plankW-4, (bot-top)+12);
