@@ -490,16 +490,22 @@
       var cols = parseCSVRow(rows[i]);
       if (cols.length >= 3 && cols[0]) {
         var qText = cols[0];
-        var opts = [];
-        if (cols[1]) opts.push(cols[1]);
-        if (cols[2]) opts.push(cols[2]);
-        if (cols[3]) opts.push(cols[3]);
-        if (cols[4]) opts.push(cols[4]);
 
-        // คอลัมน์ที่ 6 (index 5) คือคำตอบที่ถูก (1, 2, 3 หรือ 4)
-        var correctIndex = parseInt(cols[5]) - 1;
-        if (isNaN(correctIndex) || correctIndex < 0 || correctIndex >= opts.length) {
-          correctIndex = 0; // ถ้าไม่ได้ระบุ ให้ค่าเริ่มต้นเป็น 0
+        // เก็บตัวเลือกดิบไว้ตามตำแหน่งคอลัมน์เดิม (B,C,D,E = index 0-3)
+        // เพื่อให้คอลัมน์ F (คำตอบที่ถูก, อิงตำแหน่งคอลัมน์เดิม 1-4) ชี้ตัวเลือกที่ถูกต้อง
+        // แม้ตัวเลือกกลางบางช่องจะว่าง (เช่น ตัวเลือกที่ 1 ว่าง แต่ 2,3,4 มีค่า)
+        var rawOpts = [cols[1], cols[2], cols[3], cols[4]];
+        var correctCol = parseInt(cols[5]) - 1; // ตำแหน่งคำตอบถูกต้องตามคอลัมน์ดิบ (0-3)
+
+        var opts = [];
+        var correctIndex = -1;
+        for (var k = 0; k < rawOpts.length; k++) {
+          if (!rawOpts[k]) continue; // ข้ามช่องว่างจริงๆ แต่ไม่กระทบตำแหน่งคำตอบที่ถูก
+          if (k === correctCol) correctIndex = opts.length; // จำตำแหน่งใหม่หลังตัดช่องว่างออกแล้ว
+          opts.push(rawOpts[k]);
+        }
+        if (correctIndex === -1) {
+          correctIndex = 0; // ถ้าคอลัมน์ F ไม่ได้ระบุ/ระบุผิด ให้ค่าเริ่มต้นเป็นตัวเลือกแรกที่มีจริง
         }
         parsedQuestions.push({ q: qText, options: opts, correct: correctIndex });
       }
